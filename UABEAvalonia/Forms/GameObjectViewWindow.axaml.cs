@@ -10,6 +10,27 @@ using System.Threading.Tasks;
 
 namespace UABEAvalonia
 {
+    public bool IsSorted
+    {
+        get => _isSorted;
+        set
+        {
+            if (_isSorted != value)
+            {
+                _isSorted = value;
+                OnPropertyChanged(nameof(IsSorted));
+                SortHierarchy();
+            }
+        }
+    }
+    
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+    
     public partial class GameObjectViewWindow : Window
     {
         private InfoWindow win;
@@ -29,6 +50,47 @@ namespace UABEAvalonia
             gameObjectTreeView.SelectionChanged += GameObjectTreeView_SelectionChanged;
             gameObjectTreeView.DoubleTapped += GameObjectTreeView_DoubleTapped;
             cbxFiles.SelectionChanged += CbxFiles_SelectionChanged;
+            cbSortAlphabetically.Checked += CbSortAlphabetically_Checked;
+            cbSortAlphabetically.Unchecked += CbSortAlphabetically_Unchecked;
+        }
+
+        private void CbSortAlphabetically_Checked(object sender, RoutedEventArgs e)
+        {
+            IsSorted = true;
+        }
+
+        private void CbSortAlphabetically_Unchecked(object sender, RoutedEventArgs e)
+        {
+            IsSorted = false;
+        }
+
+        private void SortHierarchy()
+        {
+            if (IsSorted)
+            {
+                SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
+            }
+            else
+            {
+                PopulateHierarchyTreeView();
+            }
+        }
+
+        private void SortTreeViewItems(IList<object> items)
+        {
+            List<TreeViewItem> sortedItems = items.Cast<TreeViewItem>()
+                .OrderBy(item => item.Header.ToString())
+                .ToList();
+
+            items.Clear();
+            foreach (var item in sortedItems)
+            {
+                items.Add(item);
+                if (item.Items != null && item.Items.Count > 0)
+                {
+                    SortTreeViewItems((AvaloniaList<object>)item.Items);
+                }
+            }
         }
 
         public GameObjectViewWindow(InfoWindow win, AssetWorkspace workspace) : this()
@@ -132,6 +194,11 @@ namespace UABEAvalonia
 
         private void PopulateHierarchyTreeView()
         {
+            if (IsSorted)
+            {
+                SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
+            }
+            
             ComboBoxItem? selectedComboItem = (ComboBoxItem?)cbxFiles.SelectedItem;
             if (selectedComboItem == null)
                 return;
@@ -166,6 +233,23 @@ namespace UABEAvalonia
 
         private void LoadGameObjectTreeItem(AssetContainer transformCont, AssetTypeValueField transformBf, TreeViewItem? parentTreeItem)
         {
+            if (parentTreeItem == null)
+            {
+                gameObjectTreeView.Items?.Add(treeItem);
+                if (IsSorted)
+                {
+                    SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
+                }
+            }
+            else
+            {
+                parentTreeItem.Items?.Add(treeItem);
+                if (IsSorted)
+                {
+                    SortTreeViewItems((AvaloniaList<object>)parentTreeItem.Items);
+                }
+            }
+
             TreeViewItem treeItem = new TreeViewItem();
 
             AssetTypeValueField gameObjectRef = transformBf["m_GameObject"];
