@@ -1,10 +1,12 @@
+# This is a fork, the original was created by nesrak1. I do not claim ownership of any material in this repository.
+It contains a feature-set I find to personally suit my needs, it will not take away from the original but it will contain new features. See commits
+
 <p align="center"><img src="UABEAvalonia/Assets/logo.png" /></p>
 
 **Quick Downloads:**
 
-[Latest Nightly (Windows)](https://nightly.link/nesrak1/UABEA/workflows/dotnet-desktop/master/uabea-windows.zip) | [Latest Nightly (Linux)](https://nightly.link/nesrak1/UABEA/workflows/dotnet-ubuntu/master/uabea-ubuntu.zip) | [Latest Release](https://github.com/nesrak1/UABEA/releases)
+[Latest Forked Release (Windows)](https://github.com/DasVolka/UABEA/releases) | [Latest Official Release](https://github.com/nesrak1/UABEA/releases)
 
-[![GitHub issues](https://img.shields.io/github/issues/nesrak1/UABEA?logo=GitHub&style=flat-square)](https://github.com/nesrak1/UABEA/issues) [![discord](https://img.shields.io/discord/862035581491478558?label=discord&logo=discord&logoColor=FFFFFF&style=flat-square)](https://discord.gg/hd9VdswwZs)
 
 ## UABEAvalonia
 
@@ -12,7 +14,7 @@ Cross-platform Asset Bundle/Serialized File reader and writer. Originally based 
 
 ## Extracting assets
 
-I develop UABEA as more of a modding/research tool than an extracting tool. Use [AssetRipper](https://github.com/AssetRipper/AssetRipper) or [AssetStudio](https://github.com/Perfare/AssetStudio/) if you only want to extract assets.
+nesrak1 developped UABEA as more of a modding/research tool than an extracting tool. Use [AssetRipper](https://github.com/AssetRipper/AssetRipper) or [AssetStudio](https://github.com/Perfare/AssetStudio/) if you only want to extract assets.
 
 ## Addressables
 
