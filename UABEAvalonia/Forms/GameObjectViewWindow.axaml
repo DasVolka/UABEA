@@ -8,33 +8,43 @@
         Icon="/Assets/uabeavalonia16.ico"
         x:Class="UABEAvalonia.GameObjectViewWindow"
         Title="GameObject Viewer">
-  <Grid>
-    <Grid.RowDefinitions>
-      <RowDefinition Height="26" />
-      <RowDefinition Height="*" />
-      <RowDefinition Height="26" />
-    </Grid.RowDefinitions>
-    <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="*" />
-      <ColumnDefinition Width="5" />
-      <ColumnDefinition Width="*" />
-    </Grid.ColumnDefinitions>
-    
-    <Label Grid.Row="0" Grid.Column="0" Content="Scene Hierarchy" />
-    <Label Grid.Row="0" Grid.Column="2" Content="Components" />
-    
-    <TreeView Grid.Row="1" Grid.Column="0" Name="gameObjectTreeView" />
-    <GridSplitter Grid.Row="1" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" />
-    <uabea:AssetDataTreeView Grid.Row="1" Grid.Column="2" Name="componentTreeView"/>
-    
-    <Grid Grid.Row="2" Grid.Column="0">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="48" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-      <CheckBox Name="cbSortAlphabetically" Content="Sort Alphabetically" IsChecked="{Binding IsSorted}" Margin="5"/>
-      <Label Grid.Column="0" Content="File: " />
-      <ComboBox Grid.Column="1" Height="26" HorizontalAlignment="Stretch" Name="cbxFiles" />
-    </Grid>
-  </Grid>
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="26" />
+			<RowDefinition Height="26" />
+			<RowDefinition Height="*" />
+			<RowDefinition Height="26" />
+		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" />
+			<ColumnDefinition Width="5" />
+			<ColumnDefinition Width="*" />
+		</Grid.ColumnDefinitions>
+		
+		<Grid Grid.Row="0" Grid.Column="0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+			<Label Grid.Column="0" Content="Search: " />
+			<TextBox Grid.Column="1" HorizontalAlignment="Stretch" Name="searchBox" Watermark="Item Name"></TextBox>
+		</Grid>
+		
+		<Label Grid.Row="1" Grid.Column="0" Content="Scene Hierarchy" />
+		<Label Grid.Row="1" Grid.Column="2" Content="Component View" />
+
+		<TreeView Grid.Row="2" Grid.Column="0" Name="gameObjectTreeView" />
+		<GridSplitter Grid.Row="2" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" />
+		<uabea:AssetDataTreeView Grid.Row="2" Grid.Column="2" Name="componentTreeView"/>
+		
+		<Grid Grid.Row="3" Grid.Column="0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="*" />
+			</Grid.ColumnDefinitions>
+			<Label Grid.Column="0" Content="File: " />
+			<ComboBox Grid.Column="1" HorizontalAlignment="Stretch" Name="cbxFiles" />
+		</Grid>
+		<CheckBox Grid.Row="3" Grid.Column="2" IsChecked="True" Name="chkSortAlphabetically">Sort root GameObjects alphabetically</CheckBox>
+	</Grid>
 </Window>

@@ -4,33 +4,16 @@ using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Input;
+using Avalonia.Threading;
+using System.ComponentModel;
 
 namespace UABEAvalonia
 {
-    public bool IsSorted
-    {
-        get => _isSorted;
-        set
-        {
-            if (_isSorted != value)
-            {
-                _isSorted = value;
-                OnPropertyChanged(nameof(IsSorted));
-                SortHierarchy();
-            }
-        }
-    }
-    
-    public event PropertyChangedEventHandler PropertyChanged;
-
-    protected virtual void OnPropertyChanged(string propertyName)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-    
     public partial class GameObjectViewWindow : Window
     {
         private InfoWindow win;
@@ -39,6 +22,9 @@ namespace UABEAvalonia
         private bool ignoreDropdownEvent;
         private AssetContainer? selectedGo;
         private TreeViewItem? selectedTreeItem;
+        private string searchText = "";
+        private System.Timers.Timer? _searchDebounceTimer;
+        private Dictionary<long, string> _gameObjectNameCache = new();
 
         public GameObjectViewWindow()
         {
@@ -50,48 +36,36 @@ namespace UABEAvalonia
             gameObjectTreeView.SelectionChanged += GameObjectTreeView_SelectionChanged;
             gameObjectTreeView.DoubleTapped += GameObjectTreeView_DoubleTapped;
             cbxFiles.SelectionChanged += CbxFiles_SelectionChanged;
-            cbSortAlphabetically.Checked += CbSortAlphabetically_Checked;
-            cbSortAlphabetically.Unchecked += CbSortAlphabetically_Unchecked;
+            // Initialize the checkbox
+            chkSortAlphabetically.IsCheckedChanged += ChkSortAlphabetically_CheckedChanged;
+            searchBox.TextChanged += SearchBox_TextChanged;
         }
 
-        private void CbSortAlphabetically_Checked(object sender, RoutedEventArgs e)
+        private void ChkSortAlphabetically_CheckedChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            IsSorted = true;
+            PopulateHierarchyTreeView();
         }
 
-        private void CbSortAlphabetically_Unchecked(object sender, RoutedEventArgs e)
+        private void SearchBox_TextChanged(object? sender, TextChangedEventArgs e)
         {
-            IsSorted = false;
-        }
-
-        private void SortHierarchy()
-        {
-            if (IsSorted)
+            if (_searchDebounceTimer == null)
             {
-                SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
-            }
-            else
-            {
-                PopulateHierarchyTreeView();
-            }
-        }
-
-        private void SortTreeViewItems(IList<object> items)
-        {
-            List<TreeViewItem> sortedItems = items.Cast<TreeViewItem>()
-                .OrderBy(item => item.Header.ToString())
-                .ToList();
-
-            items.Clear();
-            foreach (var item in sortedItems)
-            {
-                items.Add(item);
-                if (item.Items != null && item.Items.Count > 0)
+                _searchDebounceTimer = new System.Timers.Timer(300); // 300ms delay
+                _searchDebounceTimer.Elapsed += (s, e) =>
                 {
-                    SortTreeViewItems((AvaloniaList<object>)item.Items);
-                }
+                    Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        searchText = searchBox.Text?.ToLowerInvariant() ?? "";
+                        PopulateHierarchyTreeView();
+                    });
+                };
+                _searchDebounceTimer.AutoReset = false;
             }
+
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
         }
+
 
         public GameObjectViewWindow(InfoWindow win, AssetWorkspace workspace) : this()
         {
@@ -194,11 +168,6 @@ namespace UABEAvalonia
 
         private void PopulateHierarchyTreeView()
         {
-            if (IsSorted)
-            {
-                SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
-            }
-            
             ComboBoxItem? selectedComboItem = (ComboBoxItem?)cbxFiles.SelectedItem;
             if (selectedComboItem == null)
                 return;
@@ -209,6 +178,8 @@ namespace UABEAvalonia
 
             // clear treeview
             gameObjectTreeView.Items.Clear();
+
+            List<AssetContainer> rootTransforms = new List<AssetContainer>();
 
             foreach (var asset in workspace.LoadedAssets)
             {
@@ -225,33 +196,31 @@ namespace UABEAvalonia
                     // is root GameObject
                     if (pathId == 0)
                     {
-                        LoadGameObjectTreeItem(assetCont, transformBf, null);
+                        rootTransforms.Add(assetCont);
                     }
                 }
             }
+
+            // Sort root transforms if the checkbox is checked
+            if (chkSortAlphabetically.IsChecked == true)
+            {
+                rootTransforms.Sort((a, b) => {
+                    var aName = GetGameObjectName(a);
+                    var bName = GetGameObjectName(b);
+                    return string.Compare(aName, bName, System.StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            foreach (var rootTransform in rootTransforms)
+            {
+                AssetTypeValueField transformBf = workspace.GetBaseField(rootTransform);
+                LoadGameObjectTreeItem(rootTransform, transformBf, null);
+            }
         }
+
 
         private void LoadGameObjectTreeItem(AssetContainer transformCont, AssetTypeValueField transformBf, TreeViewItem? parentTreeItem)
         {
-            if (parentTreeItem == null)
-            {
-                gameObjectTreeView.Items?.Add(treeItem);
-                if (IsSorted)
-                {
-                    SortTreeViewItems((AvaloniaList<object>)gameObjectTreeView.Items);
-                }
-            }
-            else
-            {
-                parentTreeItem.Items?.Add(treeItem);
-                if (IsSorted)
-                {
-                    SortTreeViewItems((AvaloniaList<object>)parentTreeItem.Items);
-                }
-            }
-
-            TreeViewItem treeItem = new TreeViewItem();
-
             AssetTypeValueField gameObjectRef = transformBf["m_GameObject"];
             AssetContainer gameObjectCont = workspace.GetAssetContainer(transformCont.FileInstance, gameObjectRef, false);
 
@@ -261,33 +230,88 @@ namespace UABEAvalonia
             AssetTypeValueField gameObjectBf = workspace.GetBaseField(gameObjectCont);
             string name = gameObjectBf["m_Name"].AsString;
 
-            treeItem.Header = name;
-            treeItem.Tag = gameObjectCont;
+            // Create current tree item
+            TreeViewItem currentItem = new TreeViewItem();
+            currentItem.Header = name;
+            currentItem.Tag = gameObjectCont;
+
+            // Check if this is a root node
+            bool isRoot = parentTreeItem == null;
+
+            // Only evaluate search for root nodes
+            if (isRoot && !string.IsNullOrWhiteSpace(searchText))
+            {
+                bool matchesSearch = name.ToLowerInvariant().Contains(searchText);
+                if (!matchesSearch)
+                    return;
+            }
+
+            // Get all child transforms
+            List<AssetContainer> childTransforms = new List<AssetContainer>();
 
             AssetTypeValueField children = transformBf["m_Children"]["Array"];
             foreach (AssetTypeValueField child in children)
             {
                 AssetContainer childTransformCont = workspace.GetAssetContainer(transformCont.FileInstance, child, false);
-                AssetTypeValueField childTransformBf = workspace.GetBaseField(childTransformCont);
-                LoadGameObjectTreeItem(childTransformCont, childTransformBf, treeItem);
+
+                childTransforms.Add(childTransformCont);
             }
 
-            if (parentTreeItem == null)
+            // Sort child transforms if the checkbox is checked
+            if (chkSortAlphabetically.IsChecked == true)
             {
-                gameObjectTreeView.Items?.Add(treeItem);
+                childTransforms.Sort((a, b) => {
+                    var aName = GetGameObjectName(a);
+                    var bName = GetGameObjectName(b);
+                    return string.Compare(aName, bName, System.StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+
+            foreach (var childTransformCont in childTransforms)
+            {
+                AssetTypeValueField childTransformBf = workspace.GetBaseField(childTransformCont);
+                LoadGameObjectTreeItem(childTransformCont, childTransformBf, currentItem);
+            }
+
+            // If this is the selected GameObject, update the reference
+            if (selectedGo != null &&
+                gameObjectCont.FileInstance == selectedGo.FileInstance &&
+                gameObjectCont.PathId == selectedGo.PathId)
+            {
+                selectedTreeItem = currentItem;
+            }
+
+            // Add to tree
+            if (isRoot)
+            {
+                gameObjectTreeView.Items?.Add(currentItem);
             }
             else
             {
-                parentTreeItem.Items?.Add(treeItem);
+                parentTreeItem?.Items?.Add(currentItem);
+            }
+        }
+
+        private string GetGameObjectName(AssetContainer transformCont)
+        {
+            AssetTypeValueField transformBf = workspace.GetBaseField(transformCont);
+            AssetTypeValueField gameObjectRef = transformBf["m_GameObject"];
+            long pathId = gameObjectRef["m_PathID"].AsLong;
+
+            if (_gameObjectNameCache.TryGetValue(pathId, out string? cachedName))
+            {
+                return cachedName;
             }
 
-            if (selectedGo != null)
-            {
-                if (gameObjectCont.FileInstance == selectedGo.FileInstance && gameObjectCont.PathId == selectedGo.PathId)
-                {
-                    selectedTreeItem = treeItem;
-                }
-            }
+            AssetContainer gameObjectCont = workspace.GetAssetContainer(transformCont.FileInstance, gameObjectRef, false);
+            if (gameObjectCont == null)
+                return string.Empty;
+
+            AssetTypeValueField gameObjectBf = workspace.GetBaseField(gameObjectCont);
+            string name = gameObjectBf["m_Name"].AsString;
+            _gameObjectNameCache[pathId] = name;
+            return name;
         }
     }
 }
