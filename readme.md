@@ -14,7 +14,7 @@ Cross-platform Asset Bundle/Serialized File reader and writer. Originally based 
 
 ## Extracting assets
 
-nesrak1 developped UABEA as more of a modding/research tool than an extracting tool. Use [AssetRipper](https://github.com/AssetRipper/AssetRipper) or [AssetStudio](https://github.com/Perfare/AssetStudio/) if you only want to extract assets.
+nesrak1 developed UABEA as more of a modding/research tool than an extracting tool. Use [AssetRipper](https://github.com/AssetRipper/AssetRipper) or [AssetStudio](https://github.com/Perfare/AssetStudio/) if you only want to extract assets.
 
 ## Addressables
 
