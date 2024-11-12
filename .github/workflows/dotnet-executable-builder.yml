@@ -1,5 +1,4 @@
 name: Build UABEA Cross-Platform
-
 on:
   push:
     branches: [ master ]
@@ -12,52 +11,75 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-2022]
-
+    
     steps:
     - name: Checkout
       uses: actions/checkout@v2
       with:
         fetch-depth: 0
-
+        
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 6.0.x
-
+        
     - name: Setup MSBuild (Windows only)
       if: runner.os == 'Windows'
       uses: microsoft/setup-msbuild@v1.1
+      
+    - name: Build UABEA
+      shell: bash
+      run: |
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          dotnet publish UABEAvalonia.sln -c Release -r linux-x64 --self-contained -o ./publish/ubuntu
+        else
+          msbuild UABEAvalonia.sln /restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:OutputPath=./publish/windows
+        fi
 
-    # Build Step - Different Commands for Each OS
-    - name: Build UABEA (Ubuntu)
+    - name: Verify Build Output (Linux)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
-        dotnet publish UABEAvalonia.sln -c Release -r linux-x64 --self-contained -o ./publish/ubuntu
+        if [ ! -d "./publish/ubuntu" ]; then
+          echo "Build output directory not found!"
+          exit 1
+        fi
+        if [ -z "$(ls -A ./publish/ubuntu)" ]; then
+          echo "Build output directory is empty!"
+          exit 1
+        fi
+        echo "Build output verified successfully"
 
-    - name: Build UABEA (Windows)
+    - name: Verify Build Output (Windows)
       if: runner.os == 'Windows'
+      shell: bash
       run: |
-        msbuild UABEAvalonia.sln /restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:OutputPath=./publish/windows
-
-    # Package Step - Different Commands for Each OS
-    - name: Package as Zip (Ubuntu)
-      if: runner.os == 'Linux'
+        if [ ! -d "./publish/windows" ]; then
+          echo "Build output directory not found!"
+          exit 1
+        fi
+        if [ -z "$(ls -A ./publish/windows)" ]; then
+          echo "Build output directory is empty!"
+          exit 1
+        fi
+        echo "Build output verified successfully"
+        
+    - name: Package as Zip
+      shell: bash
       run: |
-        zip -r uabea-ubuntu.zip ./publish/ubuntu
-
-    - name: Package as Zip (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        Compress-Archive -Path ./publish/windows -DestinationPath uabea-windows.zip
-
-    # Upload Artifacts
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          zip -r uabea-ubuntu.zip ./publish/ubuntu
+        else
+          zip -r uabea-windows.zip ./publish/windows
+        fi
+        
     - name: Upload Ubuntu Zip
       if: runner.os == 'Linux'
       uses: actions/upload-artifact@v3
       with:
         name: uabea-ubuntu
         path: uabea-ubuntu.zip
-
+        
     - name: Upload Windows Zip
       if: runner.os == 'Windows'
       uses: actions/upload-artifact@v3
