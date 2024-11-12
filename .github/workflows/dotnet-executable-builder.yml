@@ -1,18 +1,65 @@
-name: Build UABEA Cross-Platform
+name: Build UABEA
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  release:
+    types: [created]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-2022]
-      fail-fast: false  # Allow other builds to continue if one fails
-    
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
+      
+    - name: Build UABEA
+      run: |
+        dotnet publish UABEAvalonia/UABEAvalonia.csproj \
+          -c Release \
+          -r linux-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -o ./publish/ubuntu
+
+    - name: Verify Build Output
+      run: |
+        if [ ! -d "./publish/ubuntu" ] || [ -z "$(ls -A ./publish/ubuntu)" ]; then
+          echo "Build output missing or empty!"
+          exit 1
+        fi
+        echo "Build output verified successfully"
+        
+    - name: Package as Zip
+      run: zip -r uabea-ubuntu.zip ./publish/ubuntu
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: uabea-ubuntu
+        path: uabea-ubuntu.zip
+
+    - name: Upload Release Asset
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./uabea-ubuntu.zip
+        asset_name: uabea-ubuntu.zip
+        asset_content_type: application/zip
+
+  build-windows:
+    runs-on: windows-2022
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -24,76 +71,44 @@ jobs:
       with:
         dotnet-version: 6.0.x
         
-    - name: Setup MSBuild (Windows only)
-      if: runner.os == 'Windows'
+    - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v1.1
       
     - name: Build UABEA
-      shell: bash
       run: |
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          dotnet publish UABEAvalonia/UABEAvalonia.csproj \
-            -c Release \
-            -r linux-x64 \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -o ./publish/ubuntu
-        else
-          dotnet publish UABEAvalonia/UABEAvalonia.csproj \
-            -c Release \
-            -r win-x64 \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -o ./publish/windows
-        fi
+        dotnet publish UABEAvalonia/UABEAvalonia.csproj `
+          -c Release `
+          -r win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -o ./publish/windows
 
-    - name: Verify Build Output (Linux)
-      if: runner.os == 'Linux'
-      shell: bash
+    - name: Verify Build Output
+      shell: pwsh
       run: |
-        if [ ! -d "./publish/ubuntu" ]; then
-          echo "Build output directory not found!"
+        if (-not (Test-Path "./publish/windows") -or -not (Get-ChildItem "./publish/windows")) {
+          Write-Error "Build output missing or empty!"
           exit 1
-        fi
-        if [ -z "$(ls -A ./publish/ubuntu)" ]; then
-          echo "Build output directory is empty!"
-          exit 1
-        fi
-        echo "Build output verified successfully"
-
-    - name: Verify Build Output (Windows)
-      if: runner.os == 'Windows'
-      shell: bash
-      run: |
-        if [ ! -d "./publish/windows" ]; then
-          echo "Build output directory not found!"
-          exit 1
-        fi
-        if [ -z "$(ls -A ./publish/windows)" ]; then
-          echo "Build output directory is empty!"
-          exit 1
-        fi
-        echo "Build output verified successfully"
+        }
+        Write-Output "Build output verified successfully"
         
     - name: Package as Zip
-      shell: bash
-      run: |
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          zip -r uabea-ubuntu.zip ./publish/ubuntu
-        else
-          zip -r uabea-windows.zip ./publish/windows
-        fi
+      shell: pwsh
+      run: Compress-Archive -Path ./publish/windows/* -DestinationPath uabea-windows.zip
         
-    - name: Upload Ubuntu Zip
-      if: runner.os == 'Linux'
-      uses: actions/upload-artifact@v3
-      with:
-        name: uabea-ubuntu
-        path: uabea-ubuntu.zip
-        
-    - name: Upload Windows Zip
-      if: runner.os == 'Windows'
+    - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: uabea-windows
         path: uabea-windows.zip
+
+    - name: Upload Release Asset
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./uabea-windows.zip
+        asset_name: uabea-windows.zip
+        asset_content_type: application/zip
