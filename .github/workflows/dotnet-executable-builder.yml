@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
@@ -28,12 +28,27 @@ jobs:
           -r linux-x64 \
           --self-contained true \
           -p:PublishSingleFile=true \
+          -p:DebugType=None \
+          -p:DebugSymbols=false \
+          -p:PublishTrimmed=true \
+          -p:Version=${{ github.event.release.tag_name || '1.0.0' }} \
           -o ./publish/ubuntu
-
+          
     - name: Verify Build Output
       run: |
         if [ ! -d "./publish/ubuntu" ] || [ -z "$(ls -A ./publish/ubuntu)" ]; then
           echo "Build output missing or empty!"
+          exit 1
+        fi
+        # Check executable permissions
+        if [ ! -x "./publish/ubuntu/UABEAvalonia" ]; then
+          echo "Executable permissions not set!"
+          exit 1
+        fi
+        # Check file size
+        size=$(stat -f%z "./publish/ubuntu/UABEAvalonia")
+        if [ "$size" -lt 1000000 ]; then
+          echo "Binary file suspiciously small!"
           exit 1
         fi
         echo "Build output verified successfully"
@@ -42,27 +57,16 @@ jobs:
       run: zip -r uabea-ubuntu.zip ./publish/ubuntu
         
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: uabea-ubuntu
         path: uabea-ubuntu.zip
-
-    - name: Upload Release Asset
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./uabea-ubuntu.zip
-        asset_name: uabea-ubuntu.zip
-        asset_content_type: application/zip
 
   build-windows:
     runs-on: windows-2022
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
@@ -81,13 +85,27 @@ jobs:
           -r win-x64 `
           --self-contained true `
           -p:PublishSingleFile=true `
+          -p:DebugType=None `
+          -p:DebugSymbols=false `
+          -p:PublishTrimmed=true `
+          -p:Version=${{ github.event.release.tag_name || '1.0.0' }} `
           -o ./publish/windows
-
+          
     - name: Verify Build Output
       shell: pwsh
       run: |
         if (-not (Test-Path "./publish/windows") -or -not (Get-ChildItem "./publish/windows")) {
           Write-Error "Build output missing or empty!"
+          exit 1
+        }
+        $exe = "./publish/windows/UABEAvalonia.exe"
+        if (-not (Test-Path $exe)) {
+          Write-Error "Executable not found!"
+          exit 1
+        }
+        $size = (Get-Item $exe).Length
+        if ($size -lt 1MB) {
+          Write-Error "Binary file suspiciously small!"
           exit 1
         }
         Write-Output "Build output verified successfully"
@@ -97,18 +115,33 @@ jobs:
       run: Compress-Archive -Path ./publish/windows/* -DestinationPath uabea-windows.zip
         
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: uabea-windows
         path: uabea-windows.zip
 
-    - name: Upload Release Asset
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
+  upload-release:
+    needs: [build-ubuntu, build-windows]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Download Ubuntu Build
+      uses: actions/download-artifact@v4
+      with:
+        name: uabea-ubuntu
+        
+    - name: Download Windows Build
+      uses: actions/download-artifact@v4
+      with:
+        name: uabea-windows
+        
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          uabea-ubuntu.zip
+          uabea-windows.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./uabea-windows.zip
-        asset_name: uabea-windows.zip
-        asset_content_type: application/zip
