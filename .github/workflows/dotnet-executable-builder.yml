@@ -28,22 +28,29 @@ jobs:
       if: runner.os == 'Windows'
       uses: microsoft/setup-msbuild@v1.1
 
-    - name: Build UABEA
+    # Build Step - Different Commands for Each OS
+    - name: Build UABEA (Ubuntu)
+      if: runner.os == 'Linux'
       run: |
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          dotnet publish UABEAvalonia.sln -c Release -r linux-x64 --self-contained -o ./publish/linux
-        else
-          msbuild UABEAvalonia.sln /restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:OutputPath=./publish/windows
-        fi
+        dotnet publish UABEAvalonia.sln -c Release -r linux-x64 --self-contained -o ./publish/ubuntu
 
-    - name: Package as Zip
+    - name: Build UABEA (Windows)
+      if: runner.os == 'Windows'
       run: |
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          zip -r uabea-ubuntu.zip ./publish/ubuntu
-        else
-          zip -r uabea-windows.zip ./publish/windows
-        fi
+        msbuild UABEAvalonia.sln /restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:OutputPath=./publish/windows
 
+    # Package Step - Different Commands for Each OS
+    - name: Package as Zip (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        zip -r uabea-ubuntu.zip ./publish/ubuntu
+
+    - name: Package as Zip (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Compress-Archive -Path ./publish/windows -DestinationPath uabea-windows.zip
+
+    # Upload Artifacts
     - name: Upload Ubuntu Zip
       if: runner.os == 'Linux'
       uses: actions/upload-artifact@v3
